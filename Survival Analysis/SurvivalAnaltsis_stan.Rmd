@@ -1,0 +1,390 @@
+---
+title: "Survival Analysis"
+author: "Vijender Singh, CBC, UCHC"
+date: "`r Sys.Date()`"
+email: "vijender.singh@uconn.edu, singh.vijender@gmail.com"
+output:
+  pdf_document: default
+  df_print: paged
+  html_document:
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+
+# Hands-on Survival analysis tutorial {.tabset}
+
+## Introduction
+
+This hands on guide serves as an introduction to survival analysis, which, despite its name, encompasses a broad range of applications beyond the study of mortality. Survival analysis is a statistical method used to estimate the time until an event of interest occurs. It's applicable in various scenarios, including but not limited to:
+
+   - Determining the duration of effectiveness for a therapy before a relapse occurs.
+   - Assessing the lifespan of a component within a vehicle or manufacturing setting prior to its replacement.
+   - Evaluating the impact of a new banking security system on the incidence of hacking or fraud.
+   - Analyzing the effect of a medication on a cancer patient's survival.
+
+These examples illustrate the versatility of survival analysis in measuring the time from the initiation of an observation to the occurrence of a specific event (e.g., therapy relapse, component failure, account breach, etc.). Typically, these studies are conducted within a predetermined timeframe, often dictated by funding constraints or the need to draw conclusions within a reasonable period. This introduces the concept of censoring in survival analysis. An observation is considered censored if the event of interest does not occur within the study period, if the event timing is not accurately captured (for example, a vehicle component fails but is only identified during a later inspection), or in clinical studies, if a participant withdraws before the study's conclusion.
+
+Survival analysis employs several key methodologies, including:
+
+ - **Kaplan-Meier test**: This method tracks the occurrence of events over time, aiming to determine the duration before a certain percentage of events occur, or the fraction of events happening by a specific time point. For example, it can estimate the time until 50% of patients experience a relapse following treatment. Kaplan-Meier curves effectively display survival discrepancies between two distinct categorical groups. However, they fall short in evaluating the impact of quantitative factors such as age, blodd pressure, gene expression among others. On the other hand, Cox Proportional Hazards (PH) regression is adept at examining the influence of both categorical and continuous variables, and it can simultaneously model the effects of various variables.
+
+ - **Log Rank test**: This test is useful for comparing the survival rates between two different interventions or methodologies. For example, it can compare the longevity of two types of dental fillings or the efficacy of two weight loss drugs. The test will provide p values to show the significance.
+
+ - **Cox Proportional Hazards Model**: This approach is taken when additional factors need to be considered in the analysis, such as comparing the effectiveness of two drugs while accounting for age, gender, smoking status, etc.
+ 
+ - **Landmark dependent Covariate analysis**:  The above methodolgies include or examine covariates that are being measured at baseline before the study time begins for the event.There would be scenerios where we would be interested in the covaraites measured after the start of the study time. Based on the study and research question a specific time point is chosen refered as "landmark" which is a fixed moment in time relative to the start of the study or the beginning of an individual's follow-up period.
+ 
+ - **Time Dependent Covariates**: Sometimes the covariate that we are interested in changes during the course of the study with time.  It is difficult to pick a "landmark" or a landmark may exclude large number of observations
+ 
+ 
+ 
+ However we can quickly think of scenerios when the covariates may be changing during the study period.  For example the number of servicing a machine equipment went through before the study end time, in clinal set the weight (BMI) of an individual is something that may change.
+
+This overview underscores the fundamental concepts and applications of survival analysis, demonstrating its significance in a wide array of research and practical contexts.
+
+For our study case we will 2 different datasets.
+
+For our case study, we will examine two distinct datasets:
+
+- **Stan:** This dataset includes data on the survival outcomes of patients who participated in the Stanford heart transplant program, here we will consider "follow-up" as an event.
+
+- **miR10b-21_glioma:** This dataset focuses on the expression levels of microRNAs miR-10b and miR-21 in glioblastoma tumors. We aim to investigate whether the expression levels of these miRNAs in tumors affect patient survival rates.
+
+### Important Notes:
+
+#### **Censoring**
+
+**Censoring** is a crucial concept that deals with incomplete data. Censoring occurs when the exact time of the event of interest (such as death, failure, recovery) is not known for all subjects in the study. There are three main types of censoring: left, right, and interval censoring. Each type deals with different kinds of incomplete information:
+
+1. **Right Censoring**: This is the most common form of censoring in survival analysis. Right censoring occurs when the event of interest has not happened yet at the time of analysis, or the study ends before the event occurs for some subjects. For example, if a study follows patients for 5 years after treatment, and a patient is still alive at the end of the study, their survival time is right-censored. We know they survived at least 5 years, but we do not know their total survival time.
+
+2. **Left Censoring**: Left censoring occurs when the event of interest has already occurred before the subject starts being observed. For instance, if a study is looking at the duration of a certain condition and participants enter the study after they've already had the condition for an unknown amount of time, their exact starting time is unknown. We know that the event (onset of the condition) occurred, but we don’t know how long ago.
+
+3. **Interval Censoring**: Interval censoring happens when the exact time of the event is not known, but it is known to have occurred within a certain interval. This could be due to periodic follow-up visits where the event of interest (like tumor recurrence) could have happened at any time between visits. For instance, if a patient was disease-free at their 6-month visit but found to have a recurrence at their 12-month visit, the exact time of recurrence is unknown, only that it occurred within the 6 to 12-month interval.
+
+These forms of censoring are critical to handle appropriately in survival analysis because they can significantly impact the estimation of survival functions and the interpretation of the study's findings. Various statistical methods and models have been developed to account for these types of incomplete data.
+
+#### **Encoding**
+Note: the Surv() function in the {survival} package accepts by default TRUE/FALSE, where TRUE is event and FALSE is censored; 1/0 where 1 is event and 0 is censored; or 2/1 where 2 is event and 1 is censored. Please take care to ensure the event indicator is properly formatted.
+
+
+## Kaplan Meier Test
+
+The method is commonly used for estimating survival time and  probabilities. 
+
+### Load Packages
+The essential tools for conducting survival analysis are found within the survival packagea component of basic basic R setup.  Load the package with `library(survival)` function.  We will need `tidyverse` for data table manipulation and `survminer` and `ggplot2` for better graphics. `stan` dataset is part of `gss` package, hence we will load that too.
+
+```{r packageLoading, include=TRUE, results="hold"}
+suppressPackageStartupMessages(library("tidyverse",quietly=TRUE))
+suppressPackageStartupMessages(library("survival",quietly=TRUE))
+suppressPackageStartupMessages(library("survminer",quietly=TRUE))
+suppressPackageStartupMessages(library("ggplot2",quietly=TRUE))
+suppressPackageStartupMessages(library("gss",quietly=TRUE))
+suppressPackageStartupMessages(library(gtsummary,quietly=TRUE))
+```
+
+The functions we will be using in this section are `Surv()` and `survfit()`. `Surv` function will create a survival object to be used as response in a model formula.  There time entry for each observation will be followed by `+` if it is censored.
+
+```{r dataExplore01, include=TRUE, results="hold"}
+# Lets load the stan dataset
+data(stan)
+
+# explores dataset with head(stan) or ?stan
+head(stan)
+```
+
+**Column IDs**
+time	Follow-up time after transplant, in days.
+status	Censoring status.
+age	Age at transplant.
+futime	Square root of time.
+
+All the entries under status are 1 so these are complete observations and are not censored.
+
+```{r dataExplore02, include=TRUE, results="hold"}
+tail(stan)
+```
+
+Entries at the bottom are censored observation with value `0` in status column.
+
+```{r dataExplore03, include=TRUE, results="hold"}
+table(stan$status)
+```
+
+73 observations are censored and 113 are not.
+
+As a first step we will create a `survival` object and this will include the time and censored information.
+```{r survobject01, include=TRUE, results="hold"}
+
+Surv(stan$time, stan$status)[1:20]
+```
+
+As we can notice that event time of subject1 is 15days, subject2 have 3days and so on. subject19 event time 3695 has `+` at end indicating its censored status.
+
+In the next step we will fit a survival curve with `survfir` function. Let start with the simplest form of survival curve where we are not grouping subjects on any criteris.  For this we specify just the intercept (~1) in the formula.  We can then plot the curve with `ggsurvplot()` function from  `survminer` package.
+
+```{r survobject02, include=TRUE, results="hold"}
+surv_plot=survfit(Surv(time, status)~1, data=stan)
+
+ggsurvplot(surv_plot,risk.table = TRUE)
+ 
+
+```
+
+#### x-year Survival Estimation
+
+Occasionally we want to estimate the probability of surviving at fixed timelets say 180 days.
+
+```{r survobject03, include=TRUE, results="hold"}
+surv_plot=survfit(Surv(time, status)~1, data=stan)
+
+summary(survfit(Surv(time, status) ~ 1, data = lung), times = 180)
+
+```
+
+This displays the survival probability at 180 days is 72% with 95 % confidence intervals displayed.
+
+
+
+
+This include all the observations without grouping data.  It would have been great if we had a gender information to group the subjects.  For the sake of tutorial we will assign gender (0=female,1=male) and run the analysis by grouping the subjects.  To perform grouping we will use `~ gender` in the formula.
+
+```{r survobject04, include=TRUE, results="hold"}
+# Assign random genders to 184 subjects
+
+stan$gender<-sample(c(1,0),184, replace = TRUE)
+
+head(stan)
+```
+
+Now lets fit the curve after grouping subjects by gender that we assigned randomly.
+
+```{r survobject05, include=TRUE, results="hold"}
+surv_plot2=survfit(Surv(time, status)~gender, data=stan)
+
+ggsurvplot(surv_plot2,risk.table = TRUE, tables.height =0.35,surv.median.line = "hv" )
+
+# check ggsurvplot function for plot customization.
+
+```
+
+Lets run the survive probability at 180 days as we did before.
+
+```{r survobject06, include=TRUE, results="hold"}
+
+summary(surv_plot2, times = 180)
+
+```
+
+This display the survival probability at 180 days is 70% in Females and 60% in males with 95 % confidence intervals displayed.
+
+Lets use another different dataset. This dataset encompasses miRNA expression levels in glioblastoma tumors from various patients. The tumors are categorized into two distinct groups based on their expression levels of miR10b and miR21: one group exhibits high expression of both miRNAs, while the other demonstrates low expression of these miRNAs. A tumor sample is deemed to have high expression if its levels of both miR10b and miR21 surpass the 75th percentile threshold for each miRNA. Conversely, samples with expression levels below the 75th percentile for both miRNAs are classified as having low expression.
+
+This data can be downloaded from here
+
+```{r kpt-1, include=TRUE, results="hold"}
+df<-read.csv("Gioblastoma_mir10b_21.csv")
+
+colnames(df)
+head(df)
+
+```
+The columns that are importance from survival analysis are `Status`, `days_to_death`, `gender`.  
+
+- **Status** : Expression of miR10b and miR21.  HH (high expression), LL (low expression)
+- **days-to-death** : time to event
+- **gender** : Gender of individuals.
+
+```{r kpt-2, include=TRUE, results="hold"}
+cat("\n\n Observation in status category \n")
+table(df$Status)
+
+cat("\n\n Observation in gender category \n")
+table(df$gender)
+```
+
+
+Survival based on expression status.
+```{r kpt, include=TRUE, results="hold"}
+surv3=survfit(Surv(days_to_death)~Status, data=df)
+
+ggsurvplot(surv3,risk.table = TRUE, tables.height =0.35,surv.median.line = "hv" )
+```
+
+
+Survival based on gender.
+```{r kpt-3, include=TRUE, results="hold"}
+surv4=survfit(Surv(days_to_death)~gender, data=df)
+
+ggsurvplot(surv4,risk.table = TRUE, tables.height =0.35,surv.median.line = "hv" )
+
+```
+
+
+Survival based on expression status and gender.
+```{r kpt-4, include=TRUE, results="hold"}
+surv5=survfit(Surv(days_to_death)~Status+gender, data=df)
+
+ggsurvplot(surv5,risk.table = TRUE, tables.height =0.35,surv.median.line = "hv" )
+```
+
+
+
+## Log Rank Test
+
+The **Log Rank Test** is a statistical procedure used to evaluate the significance of differences in survival rates between two groups. This test is particularly useful in the context of survival analysis, where the primary interest is to understand how different factors (such as treatment groups in clinical trials, demographic variables, or other categorical predictors) affect the probability of a certain event over time, typically events like death, failure, or relapse.
+
+The essence of the Log Rank Test lies in its comparison of the observed survival outcomes against the expected outcomes if there were no true difference between the groups. It does this across the entire duration of a study, effectively taking into account the time until each event occurs. This aspect makes the test especially powerful for analyzing time-to-event data, which is often censored (i.e., the event has not occurred for some subjects by the end of the study).
+
+Key features of the Log Rank Test include:
+
+- **Equal weighting of time points:** Each time point in the follow-up period is given equal importance. This means the test does not inherently emphasize differences at early or late stages in the follow-up, although variations of the test can be applied to focus on these aspects.
+  
+- **Non-parametric nature:** The Log Rank Test does not assume a specific distribution for the survival times, making it broadly applicable across various types of survival data.
+
+- **Comparative analysis:** While primarily designed for comparing two groups, the Log Rank Test can be extended to compare multiple groups, facilitating more complex survival analyses.
+
+- **Sensitivity to changes in survival rates:** The test is particularly sensitive to differences in survival rates between groups over the duration of the study, making it a preferred choice for many clinical and epidemiological studies.
+
+In practice, the Log Rank Test calculates a test statistic that, under the null hypothesis (assuming no difference between groups), follows a chi-square distribution. Researchers can then use this statistic to determine a p-value, which indicates the probability of observing the detected difference (or a more extreme difference) if the null hypothesis were true. A low p-value suggests that the observed differences in survival rates between the groups are statistically significant, indicating that factors distinguishing the groups might influence survival.
+
+To get the log-rank p-value we will use `survdiff` function. 
+
+```{r logrank-1, include=TRUE, results="hold"}
+
+survdiff(Surv(time, status) ~ gender, data = stan)
+
+# check ggsurvplot function for plot customisation.
+
+```
+
+The results suggest survival difference between male and female is not significant with pvalue threshold of 0.05.  The pvalue in out test is 0.1.
+
+
+Now lets run the log rank test on glioma datasets.
+```{r logrank-2, include=TRUE, results="hold"}
+survdiff(Surv(days_to_death)~Status, data=df)
+
+```
+There is significant difference between in survival rates between high and low expression of miR10b and miR21.
+
+```{r logrank-3, include=TRUE, results="hold"}
+survdiff(Surv(days_to_death)~gender, data=df)
+
+```
+There is no significant difference between in survival rates between genders.
+
+```{r logrank-4, include=TRUE, results="hold"}
+survdiff(Surv(days_to_death)~Status+gender, data=df)
+
+```
+There is significant difference between in survival rates between high and low expression of miR10b and miR21 combined with genders covariates.
+
+
+
+## Cox Proportional Hazard Ratio:
+
+The Cox proportional hazard ratio or Cox Refression model  estimates the effect of one or multiple variables. The Cox proportional hazard ratio is a semi-parametric model that measures survival outcome based univariable and multivariable regression models. Lets run the analysis om the miR-10b-21 dataset.
+
+The function we use will be `coxph` on the survival object generated using `Surv` function
+
+```{r coxhr-1, include=TRUE, results="hold"}
+# Setting reference levels
+df$Status<-relevel(as.factor(df$Status),ref="LL")
+
+coxph(Surv(days_to_death)~Status, data=df)%>% 
+  tbl_regression(exp = TRUE) 
+
+```
+Here we have LL as the reference level and compared to that HH samples have 2.45 fold higher chances of facing an event.  This difference is significant with pvalue <0.001.
+
+We can include more variables in analysis e.g **gender**
+```{r coxhr-2, include=TRUE, results="hold"}
+# Setting reference levels
+df$Status<-relevel(as.factor(df$Status),ref="LL")
+df$gender<-relevel(as.factor(df$gender),ref="female")
+
+coxph(Surv(days_to_death)~Status+gender, data=df)%>% 
+  tbl_regression(exp = TRUE) 
+
+```
+Now we have the results based on gender indicating Males have 1.62fold less survival rates than females with p<0.05, hence significant.
+
+```{r coxhr-3, include=TRUE, results="hold"}
+# Setting reference levels
+df$Status<-relevel(as.factor(df$Status),ref="LL")
+df$gender<-relevel(as.factor(df$gender),ref="male")
+df$histological_type<-relevel(as.factor(df$histological_type),ref="astrocytoma")
+coxph(Surv(days_to_death)~1+Status+gender+histological_type, data=df) %>%
+  tbl_regression(exp = TRUE) 
+
+```
+
+This displays hazard ratio in each case compared to reference.  
+
+## Landmark Analysis and Time Dependent Covariates
+
+In landmark analysis, the methodology remains consistent with previous functions, with the primary adjustment being the modification of time to account for a specified landmark. For example, if the landmark is set at 60 days, one would subtract 60 days from the total observed time for each subject. This adjusted time, referred to as "new time," is then used in the analysis. Subjects or observations lacking sufficient follow-up to reach the landmark (e.g., less than 60 days) are excluded from this analysis.
+
+The Kaplan-Meier estimator, Log Rank test, and Cox regression model are conducted as before, utilizing this adjusted timeline.
+
+For handling time-dependent covariates, where a fixed landmark time is not applicable, data must be structured to accommodate changes in covariate status over time. This involves creating multiple entries for individuals to reflect periods before and after a covariate change. Specifically, one entry captures the time from the study's start to when the covariate change occurs, and a second entry records the time from this change to the study's conclusion or to another subsequent change.
+
+To analyze time-dependent covariates, the coxph function is employed, with the dataset formatted to accurately represent these intervals and changes in covariate status over the course of the study. This approach allows for a dynamic examination of how covariates that evolve over time impact the study's outcomes.
+
+```{r coxhr-4, include=TRUE, results="hold", eval=FALSE}
+
+#Original Dataset
+##   my_id   T1 delta1   TA deltaA
+## 1     1 2081      0   67      1
+## 2     2 1602      0 1602      0
+## 3     3 1496      0 1496      0
+## 4     4 1462      0   70      1
+## 5     5 1433      0 1433      0
+
+
+#formatted for analysis Dataset
+##   id   T1 delta1 tstart tstop death agvhd
+## 1     1 2081      0      0    67     0     0
+## 2     1 2081      0     67  2081     0     1
+## 3     2 1602      0      0  1602     0     0
+## 4     3 1496      0      0  1496     0     0
+## 5     4 1462      0      0    70     0     0
+## 6     4 1462      0     70  1462     0     1
+## 7     5 1433      0      0  1433     0     0
+
+
+coxph(
+  Surv(time = tstart, time2 = tstop, event = death) ~ agvhd, data = inputdata) %>% 
+  tbl_regression(exp = TRUE)
+
+```
+
+## Refrences
+
+The tutorial is inspired from. the following sources
+
+
+-1. Clark, T., Bradburn, M., Love, S., & Altman, D. (2003). Survival analysis part I: Basic concepts and first analyses. 232-238. ISSN 0007-0920.
+
+-2. M J Bradburn, T G Clark, S B Love, & D G Altman. (2003). Survival Analysis Part II: Multivariate data analysis – an introduction to concepts and methods. British Journal of Cancer, 89(3), 431-436.
+
+-3 .Bradburn, M., Clark, T., Love, S., & Altman, D. (2003). Survival analysis Part III: Multivariate data analysis – choosing a model and assessing its adequacy and fit. 89(4), 605-11.
+
+-4. Clark, T., Bradburn, M., Love, S., & Altman, D. (2003). Survival analysis part IV: Further concepts and methods in survival analysis. 781-786. ISSN 0007-0920.
+
+-5. https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html
+
+-6. https://bioconnector.github.io/workshops/r-survival.html#rtcga
+
+```{r}
+sessionInfo()
+
+```
+
+
