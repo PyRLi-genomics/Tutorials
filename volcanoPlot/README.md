@@ -24,7 +24,7 @@ Every aspect of the plot is customisable.
 
 **`y.col="padj"`** :    Column in the input table to represent significance (could be padj value or pvalues)
 
-**`genes2label=NULL`** :   Option to specify datapoints on the plot to be labelled with the `geneName.col` ID's. Deafult label top 10 DE genes.  A custom list of genes can be provided as vector e.g. ` c("gene1", "gene2"...)`
+**`genes2label=NULL`** :   Option to specify datapoints on the plot to be labelled with the `geneName.col` ID's. Deafult label top 10 DE genes.  A custom list of genes can be provided as vector e.g. ` c("gene1", "gene2"...)`. Set `labelGenes=TRUE` for this to work.
 
 **`plot.title="VolcanoPlot"`** :    Title of plot
 
