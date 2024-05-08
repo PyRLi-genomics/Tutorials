@@ -2,7 +2,7 @@
 
 A volcano plot is a type of scatter plot used primarily in genomics and other biological research to visualize the results of high-throughput data analysis, particularly in identifying significant changes in gene expression or protein abundance. On the x-axis, it shows the log fold change, representing the magnitude of difference between two groups, while the y-axis displays the negative logarithm of the p-value, indicating the statistical significance of those differences. The plot often resembles the shape of a volcano because the most significant and substantial changes form "wings" at the top, highlighting genes or proteins that are both highly differentiated and statistically significant. This visual approach simplifies the identification of critical biomarkers or genetic markers for further research.  
 
-There are different scripts and codes are available to generate volcanoplots, some very simple others a bit complex.  Here is the code  with a visual help file that can help you to change apparoprite paraneters to modify your plots. 
+There are different scripts and codes available to generate volcano plots, some very simple and others a bit complex. Here is the code with a visual help file that can help you change apparoprite parameters to modify your plots. 
 
 ![Manual](./images/Manual_V1.1.png)
 
