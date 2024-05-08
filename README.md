@@ -12,5 +12,8 @@ This repository contains Tutorials on different aspects of bioinformatics analys
     - Landmark Analysis and Time Dependent Covariates
     - Refrences
     - Session Info
+
+2. ### [Volcano plot](./volcanoPlot/README.md)
+   A script to customise volcano plot and labelling of genes.
    
 	
