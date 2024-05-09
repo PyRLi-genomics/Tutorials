@@ -14,6 +14,6 @@ This repository contains Tutorials on different aspects of bioinformatics analys
     - Session Info
 
 2. ### [Volcano plot](./volcanoPlot/README.md)
-   A script to customise volcano plot and labelling of genes.
+   A script to customise volcano plot and labelling of genes.  A R and Python version of code is added.
    
 	
